@@ -176,10 +176,13 @@ class SupabaseService:
             "title": self._conversation_title(seed_message or ""),
             "last_message_preview": self._message_preview(seed_message or ""),
         }
+        self.client.table("chat_conversations").insert(payload).execute()
         created = self._execute_rows(
             self.client.table("chat_conversations")
-            .insert(payload)
             .select("conversation_id, user_id, title, last_message_preview, last_message_at, created_at")
+            .eq("conversation_id", conversation_id)
+            .eq("user_id", user_id)
+            .limit(1)
         )
         return created[0] if created else payload
 
@@ -197,10 +200,16 @@ class SupabaseService:
             "role": role,
             "content": content,
         }
+        self.client.table("chat_messages").insert(payload).execute()
         created = self._execute_rows(
             self.client.table("chat_messages")
-            .insert(payload)
             .select("id, conversation_id, user_id, role, content, created_at")
+            .eq("conversation_id", conversation_id)
+            .eq("user_id", user_id)
+            .eq("role", role)
+            .eq("content", content)
+            .order("created_at", desc=True)
+            .limit(1)
         )
 
         update_payload = {
