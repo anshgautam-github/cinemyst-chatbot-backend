@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from .agent import CineMystChatAgent
 from .config import get_settings
+from .routes.recommendation import router as recommendation_router
 from .schemas import (
     ChatRequest,
     ChatResponse,
@@ -33,6 +34,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.include_router(recommendation_router)
 
 
 @app.get("/health")
