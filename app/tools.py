@@ -8,6 +8,7 @@ from .supabase_service import SupabaseService
 
 
 def build_tools(service: SupabaseService):
+    """Expose a curated, safe tool surface to the LLM instead of raw database access."""
     @tool
     def get_user_profile(user_id: str) -> str:
         """Return the CineMyst user profile for the given profiles.id."""
@@ -88,4 +89,3 @@ def build_tools(service: SupabaseService):
         search_jobs,
         recommend_mentors_for_user,
     ]
-

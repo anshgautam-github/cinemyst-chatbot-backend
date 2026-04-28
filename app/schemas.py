@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class ChatRequest(BaseModel):
+    """Request body for both standard and streaming chat endpoints."""
     user_id: str = Field(description="The CineMyst profiles.id for the current user.")
     message: str = Field(description="The user's natural language query.")
     conversation_id: str | None = Field(
@@ -11,6 +12,7 @@ class ChatRequest(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    """Full chat response returned by the non-streaming endpoint."""
     answer: str
     user_id: str
     conversation_id: str
@@ -18,12 +20,14 @@ class ChatResponse(BaseModel):
 
 
 class UserContextResponse(BaseModel):
+    """Profile snapshot plus recent bookings shown around the chat UI."""
     user_id: str
     profile: dict
     bookings: list[dict]
 
 
 class ConversationSummary(BaseModel):
+    """Small conversation card shown in a conversation list view."""
     conversation_id: str
     user_id: str
     title: str
@@ -33,6 +37,7 @@ class ConversationSummary(BaseModel):
 
 
 class ConversationMessage(BaseModel):
+    """One stored chat message."""
     message_id: str | None = None
     conversation_id: str
     user_id: str
@@ -42,11 +47,43 @@ class ConversationMessage(BaseModel):
 
 
 class ConversationListResponse(BaseModel):
+    """Conversation list API response."""
     user_id: str
     conversations: list[ConversationSummary]
 
 
 class ConversationMessagesResponse(BaseModel):
+    """Conversation detail API response."""
     user_id: str
     conversation_id: str
     messages: list[ConversationMessage]
+
+
+class ProfileProcessingResult(BaseModel):
+    """Summary of what happened during profile embedding and interest processing."""
+    user_id: str
+    embedding_dimensions: int
+    interest_count: int
+    interests: list[str]
+
+
+class ProcessProfileResponse(BaseModel):
+    """Response returned after refreshing one user's profile intelligence."""
+    success: bool
+    user_id: str
+    profile_processing: ProfileProcessingResult
+    recommendation_count: int
+
+
+class RecommendationItem(BaseModel):
+    """One recommended profile with its score and lightweight profile payload."""
+    recommended_user_id: str
+    score: float
+    profile: dict
+
+
+class RecommendationsResponse(BaseModel):
+    """Recommendation list API response."""
+    user_id: str
+    count: int
+    recommendations: list[RecommendationItem]

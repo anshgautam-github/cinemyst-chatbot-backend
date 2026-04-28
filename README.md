@@ -32,17 +32,56 @@ The service accepts a `user_id` plus a chat message. It then:
 ```text
 chatbot_backend/
   app/
-    agent.py
-    config.py
+    dependencies.py
     main.py
-    prompts.py
+    config.py
     schemas.py
-    supabase_service.py
+    agent.py
+    prompts.py
     tools.py
+    supabase_service.py
+    routes/
+      chat.py
+      recommendation.py
+    services/
+      profile_service.py
+      recommendation_service.py
+    utils/
+      db.py
+      openai_service.py
   .env.example
   pyproject.toml
   README.md
 ```
+
+## Architecture flow
+
+The backend is now organized by responsibility:
+
+- `app/main.py` creates the FastAPI app and mounts feature routers
+- `app/routes/` contains HTTP endpoints only
+- `app/dependencies.py` creates shared singletons like DB clients and services
+- `app/services/` contains business logic
+- `app/utils/` contains integration helpers for OpenAI and Supabase recommendation queries
+- `app/agent.py` contains the AI concierge chat workflow
+- `app/supabase_service.py` contains the CineMyst chat/product data access layer
+
+### Chat request flow
+
+1. iOS calls `POST /v1/chat` or `POST /v1/chat/stream`
+2. `app/routes/chat.py` validates the request and resolves shared dependencies
+3. `app/agent.py` loads the user summary and conversation history
+4. LangGraph calls the safe tools in `app/tools.py`
+5. `app/supabase_service.py` reads CineMyst data from Supabase
+6. The answer is returned and the conversation is persisted
+
+### Recommendation flow
+
+1. iOS calls `POST /v1/process-profile/{user_id}` after signup or profile edits
+2. `app/services/profile_service.py` builds profile text, creates an embedding, and refreshes interests
+3. `app/services/recommendation_service.py` scores candidate profiles using embeddings + overlap + metadata
+4. Results are stored in `user_recommendations`
+5. iOS later calls `GET /v1/recommendations/{user_id}` to display saved suggestions
 
 ## Environment variables
 

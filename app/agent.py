@@ -13,12 +13,15 @@ from .tools import build_tools
 
 
 class CineMystChatAgent:
+    """Owns the AI chat workflow from prompt creation through stored conversation history."""
+
     def __init__(self, settings: Settings, supabase_service: SupabaseService) -> None:
         self.settings = settings
         self.supabase_service = supabase_service
         self.tools = build_tools(supabase_service)
 
     def _build_user_summary(self, user_id: str) -> str:
+        """Build the compact user context that gets injected into the system prompt."""
         profile = self.supabase_service.get_user_profile(user_id)
         bookings = self.supabase_service.get_user_bookings(user_id, limit=3)
 
@@ -42,6 +45,7 @@ class CineMystChatAgent:
         )
 
     def _build_agent(self, user_id: str):
+        """Create a fresh LangGraph agent per request using the current user context."""
         model = ChatOpenAI(
             api_key=self.settings.openai_api_key,
             model=self.settings.openai_model,
@@ -55,6 +59,7 @@ class CineMystChatAgent:
         )
 
     def _build_message_history(self, user_id: str, conversation_id: str) -> list[dict[str, str]]:
+        """Load stored messages and reshape them into the format expected by LangGraph."""
         history = self.supabase_service.get_conversation_messages(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -67,6 +72,7 @@ class CineMystChatAgent:
         ]
 
     def chat(self, user_id: str, message: str, conversation_id: str) -> tuple[str, str]:
+        """Run a full request/response chat cycle and persist both user and assistant messages."""
         self.supabase_service.ensure_conversation(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -75,6 +81,7 @@ class CineMystChatAgent:
         agent = self._build_agent(user_id)
         prior_messages = self._build_message_history(user_id=user_id, conversation_id=conversation_id)
         result = agent.invoke(
+            # We pass earlier messages explicitly so the chat can resume across app sessions.
             {"messages": [*prior_messages, {"role": "user", "content": message}]},
         )
         messages = result.get("messages", [])
@@ -107,6 +114,7 @@ class CineMystChatAgent:
     async def stream_chat(
         self, user_id: str, message: str, conversation_id: str
     ) -> AsyncIterator[str]:
+        """Stream a response token-by-token while still persisting the final answer at the end."""
         self.supabase_service.ensure_conversation(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -152,6 +160,7 @@ class CineMystChatAgent:
         )
 
     def _extract_stream_text(self, chunk: object) -> str:
+        """Normalize the different chunk shapes returned during streaming into plain text."""
         if isinstance(chunk, tuple):
             if chunk:
                 text = self._extract_stream_text(chunk[0])

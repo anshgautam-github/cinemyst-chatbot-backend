@@ -7,11 +7,14 @@ from app.utils.openai_service import OpenAIService
 
 
 class ProfileService:
+    """Coordinates profile enrichment: embedding creation plus DB-validated interest mapping."""
+
     def __init__(self, db: DatabaseClient, openai_service: OpenAIService) -> None:
         self.db = db
         self.openai_service = openai_service
 
     async def process_user_profile(self, user_id: str) -> dict[str, object]:
+        """Refresh one profile's embedding and replace its stored interests."""
         profile = await self.db.get_profile(user_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="Profile not found.")
@@ -39,6 +42,7 @@ class ProfileService:
         valid_interest_names: list[str] = []
         seen_interest_ids: set[str] = set()
         for interest_name in extracted_names:
+            # Only keep values that exist in the DB taxonomy, even if the model returns extras.
             match = interest_name_map.get(interest_name.strip().casefold())
             if match is None:
                 continue
@@ -60,6 +64,7 @@ class ProfileService:
         }
 
     def _build_profile_text(self, profile: dict[str, object]) -> str:
+        """Merge the profile fields that best describe a user's interests and identity."""
         parts = [
             str(profile.get("role") or "").strip(),
             str(profile.get("bio") or "").strip(),

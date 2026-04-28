@@ -7,6 +7,7 @@ from app.utils.db import DatabaseClient
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
+    """Measure how semantically similar two embedding vectors are."""
     if not vec1 or not vec2 or len(vec1) != len(vec2):
         return 0.0
 
@@ -19,6 +20,7 @@ def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
 
 
 def normalize_scores(values: list[float]) -> list[float]:
+    """Scale overlap counts into a 0..1 range so they combine cleanly with cosine similarity."""
     if not values:
         return []
     max_value = max(values)
@@ -28,10 +30,13 @@ def normalize_scores(values: list[float]) -> list[float]:
 
 
 class RecommendationService:
+    """Computes and stores hybrid profile recommendations."""
+
     def __init__(self, db: DatabaseClient) -> None:
         self.db = db
 
     async def generate_recommendations(self, user_id: str) -> list[dict[str, object]]:
+        """Score every candidate profile, store the top 20, and return them."""
         current_user = await self.db.get_profile(user_id)
         if current_user is None:
             raise HTTPException(status_code=404, detail="Profile not found.")
@@ -75,6 +80,7 @@ class RecommendationService:
         normalized_overlap = normalize_scores(overlap_counts)
         recommendations: list[dict[str, object]] = []
         for candidate, overlap_score in zip(scored_candidates, normalized_overlap, strict=False):
+            # This keeps the semantic signal dominant while still rewarding shared interests.
             score = (
                 0.6 * float(candidate["ai_similarity"])
                 + 0.3 * overlap_score

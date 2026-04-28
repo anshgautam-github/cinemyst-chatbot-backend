@@ -9,6 +9,8 @@ from app.config import Settings
 
 
 class OpenAIService:
+    """Thin wrapper around OpenAI-powered tasks used by recommendations."""
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self._embedding_client = OpenAIEmbeddings(
@@ -22,6 +24,7 @@ class OpenAIService:
         )
 
     async def generate_embedding(self, text: str) -> list[float]:
+        """Create a semantic vector for a profile summary that can be compared later."""
         cleaned_text = text.strip()
         if not cleaned_text:
             return []
@@ -29,6 +32,7 @@ class OpenAIService:
         return [float(value) for value in embedding]
 
     async def extract_interests(self, bio: str, interest_list: list[str]) -> list[str]:
+        """Ask the model to map free-form profile text onto the fixed interest taxonomy."""
         if not bio.strip() or not interest_list:
             return []
 
@@ -58,6 +62,7 @@ class OpenAIService:
         return results
 
     def _coerce_text(self, content: Any) -> str:
+        """Flatten LangChain response content into plain text before JSON parsing."""
         if isinstance(content, str):
             return content.strip()
 

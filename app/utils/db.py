@@ -10,11 +10,14 @@ from app.config import Settings
 
 
 class DatabaseClient:
+    """Async-friendly Supabase helper focused on the recommendation pipeline."""
+
     def __init__(self, settings: Settings) -> None:
         key = settings.supabase_service_role_key or settings.supabase_key
         self.client: Client = create_client(settings.supabase_url, key)
 
     async def get_profile(self, user_id: str) -> dict[str, Any] | None:
+        """Load one profile together with its already stored interest IDs."""
         rows = await self._execute_rows(
             self.client.table("profiles")
             .select("id, role, bio, location_city, embedding")
@@ -29,6 +32,7 @@ class DatabaseClient:
         return profile
 
     async def update_embedding(self, user_id: str, embedding: list[float]) -> None:
+        """Persist the latest embedding back to the `profiles` table."""
         await self._run(
             self.client.table("profiles")
             .update({"embedding": embedding})
@@ -37,6 +41,7 @@ class DatabaseClient:
         )
 
     async def get_all_interests(self) -> list[dict[str, Any]]:
+        """Return the allowed interest taxonomy that AI output must be validated against."""
         rows = await self._execute_rows(
             self.client.table("interests")
             .select("id, name")
@@ -45,6 +50,7 @@ class DatabaseClient:
         return rows
 
     async def clear_user_interests(self, user_id: str) -> None:
+        """Remove old interest mappings before replacing them with refreshed ones."""
         await self._run(
             self.client.table("user_interests")
             .delete()
@@ -53,12 +59,14 @@ class DatabaseClient:
         )
 
     async def insert_user_interests(self, user_id: str, interest_ids: list[str]) -> None:
+        """Insert the validated interest IDs selected for a user profile."""
         if not interest_ids:
             return
         payload = [{"user_id": user_id, "interest_id": interest_id} for interest_id in interest_ids]
         await self._run(self.client.table("user_interests").insert(payload).execute)
 
     async def get_user_interest_ids(self, user_id: str) -> set[str]:
+        """Read the user's interest IDs as a set for fast overlap checks."""
         rows = await self._execute_rows(
             self.client.table("user_interests")
             .select("interest_id")
@@ -71,6 +79,7 @@ class DatabaseClient:
         }
 
     async def get_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
+        """Fetch all other profiles plus their interest IDs for recommendation scoring."""
         profile_rows = await self._execute_rows(
             self.client.table("profiles")
             .select("id, role, bio, location_city, embedding")
@@ -104,6 +113,7 @@ class DatabaseClient:
         return candidates
 
     async def store_recommendations(self, user_id: str, recommendations: list[dict[str, Any]]) -> None:
+        """Replace a user's stored recommendations with the latest top-ranked results."""
         await self._run(
             self.client.table("user_recommendations")
             .delete()
@@ -125,6 +135,7 @@ class DatabaseClient:
         await self._run(self.client.table("user_recommendations").insert(payload).execute)
 
     async def get_recommendations(self, user_id: str, limit: int = 20) -> list[dict[str, Any]]:
+        """Return saved recommendations with lightweight profile data for the client."""
         rows = await self._execute_rows(
             self.client.table("user_recommendations")
             .select("user_id, recommended_user_id, score")
@@ -166,6 +177,7 @@ class DatabaseClient:
         return recommendations
 
     async def _get_interest_map(self, user_ids: list[str]) -> dict[str, set[str]]:
+        """Group `user_interests` rows by user so scoring can compare interest overlap quickly."""
         if not user_ids:
             return {}
 
@@ -183,13 +195,16 @@ class DatabaseClient:
         return interest_map
 
     async def _execute_rows(self, query: Any) -> list[dict[str, Any]]:
+        """Run a Supabase request and normalize the response payload to a list of dict rows."""
         response = await self._run(query.execute)
         return self._extract_rows(getattr(response, "data", None))
 
     async def _run(self, fn: Any) -> Any:
+        """Offload the sync Supabase client call to a worker thread for async endpoints."""
         return await asyncio.to_thread(fn)
 
     def _extract_rows(self, payload: Any) -> list[dict[str, Any]]:
+        """Handle the few payload shapes Supabase/PostgREST can return in practice."""
         if payload is None:
             return []
         if isinstance(payload, list):
@@ -204,6 +219,7 @@ class DatabaseClient:
         return []
 
     def _parse_embedding(self, raw_embedding: Any) -> list[float]:
+        """Parse pgvector values whether they come back as lists or serialized strings."""
         if raw_embedding is None:
             return []
         if isinstance(raw_embedding, list):

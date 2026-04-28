@@ -1,4 +1,5 @@
 def build_system_prompt(user_id: str, user_summary: str) -> str:
+    """Create the guardrailed system prompt used by the chat agent."""
     return f"""
 You are CineMyst's in-app AI concierge.
 
