@@ -5,6 +5,7 @@ import json
 from langchain_core.tools import tool
 
 from .supabase_service import SupabaseService
+from .utils.cache import ttl_cache
 
 
 def build_tools(service: SupabaseService):
@@ -20,6 +21,7 @@ def build_tools(service: SupabaseService):
         return json.dumps(service.get_user_bookings(user_id, limit), ensure_ascii=False)
 
     @tool
+    @ttl_cache(ttl_seconds=300)
     def search_mentors(
         role: str = "",
         specialty: str = "",
@@ -40,6 +42,7 @@ def build_tools(service: SupabaseService):
         )
 
     @tool
+    @ttl_cache(ttl_seconds=300)
     def get_mentor_details(mentor_name: str = "", mentor_id: str = "") -> str:
         """Get a detailed mentor profile by mentor name or mentor_profiles.id."""
         return json.dumps(
@@ -56,6 +59,7 @@ def build_tools(service: SupabaseService):
         return json.dumps(service.get_mentor_availability(mentor_id, limit), ensure_ascii=False)
 
     @tool
+    @ttl_cache(ttl_seconds=300)
     def search_jobs(
         role: str = "",
         location: str = "",
@@ -76,6 +80,7 @@ def build_tools(service: SupabaseService):
         )
 
     @tool
+    @ttl_cache(ttl_seconds=300)
     def recommend_mentors_for_user(user_id: str, limit: int = 4) -> str:
         """Recommend mentors personalized for the given CineMyst user id."""
         return json.dumps(service.recommend_mentors_for_user(user_id, limit), ensure_ascii=False)
