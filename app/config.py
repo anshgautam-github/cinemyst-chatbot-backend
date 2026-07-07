@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     app_port: int = Field(default=8000, alias="APP_PORT")
 
     groq_api_key: str = Field(alias="GROQ_API_KEY")
-    groq_model: str = Field(default="llama3-70b-8192", alias="GROQ_MODEL")
+    groq_model: str = Field(default="llama-3.3-70b-versatile", alias="GROQ_MODEL")
 
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_key: str = Field(alias="SUPABASE_KEY")

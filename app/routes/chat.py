@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -19,6 +20,12 @@ from app.supabase_service import SupabaseService
 
 
 router = APIRouter(prefix="/v1", tags=["chat"])
+logger = logging.getLogger(__name__)
+
+CHAT_FALLBACK_ANSWER = (
+    "I couldn't complete that request right now, but the CineMyst AI service is online. "
+    "Please try again in a moment."
+)
 
 
 @router.get("/users/{user_id}/context", response_model=UserContextResponse)
@@ -74,11 +81,16 @@ async def chat(
         raise HTTPException(status_code=400, detail="message cannot be empty")
 
     conversation_id = request.conversation_id or f"user-{request.user_id}"
-    answer, profile_summary = chat_agent.chat(
-        user_id=request.user_id,
-        message=request.message,
-        conversation_id=conversation_id,
-    )
+    try:
+        answer, profile_summary = chat_agent.chat(
+            user_id=request.user_id,
+            message=request.message,
+            conversation_id=conversation_id,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Chat request failed")
+        answer = CHAT_FALLBACK_ANSWER
+        profile_summary = ""
     return ChatResponse(
         answer=answer,
         user_id=request.user_id,

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from supabase import Client, create_client
 
 from .config import Settings
+
+logger = logging.getLogger(__name__)
 
 
 class SupabaseService:
@@ -36,8 +39,20 @@ class SupabaseService:
         return []
 
     def _execute_rows(self, query: Any) -> list[dict[str, Any]]:
-        response = query.execute()
+        try:
+            response = query.execute()
+        except Exception:  # noqa: BLE001
+            logger.exception("Supabase read failed")
+            return []
         return self._extract_rows(getattr(response, "data", None))
+
+    def _execute_write(self, query: Any) -> bool:
+        try:
+            query.execute()
+        except Exception:  # noqa: BLE001
+            logger.exception("Supabase write failed")
+            return False
+        return True
 
     def _parse_metadata(self, metadata: Any) -> dict[str, Any]:
         if metadata is None:
@@ -176,7 +191,7 @@ class SupabaseService:
             "title": self._conversation_title(seed_message or ""),
             "last_message_preview": self._message_preview(seed_message or ""),
         }
-        self.client.table("chat_conversations").insert(payload).execute()
+        self._execute_write(self.client.table("chat_conversations").insert(payload))
         created = self._execute_rows(
             self.client.table("chat_conversations")
             .select("conversation_id, user_id, title, last_message_preview, last_message_at, created_at")
@@ -200,7 +215,7 @@ class SupabaseService:
             "role": role,
             "content": content,
         }
-        self.client.table("chat_messages").insert(payload).execute()
+        self._execute_write(self.client.table("chat_messages").insert(payload))
         created = self._execute_rows(
             self.client.table("chat_messages")
             .select("id, conversation_id, user_id, role, content, created_at")
@@ -227,9 +242,12 @@ class SupabaseService:
             if not current_title or current_title == "New chat":
                 update_payload["title"] = self._conversation_title(content)
 
-        self.client.table("chat_conversations").update(update_payload).eq("conversation_id", conversation_id).eq(
-            "user_id", user_id
-        ).execute()
+        self._execute_write(
+            self.client.table("chat_conversations")
+            .update(update_payload)
+            .eq("conversation_id", conversation_id)
+            .eq("user_id", user_id)
+        )
 
         return created[0] if created else payload
 
