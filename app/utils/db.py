@@ -79,10 +79,10 @@ class DatabaseClient:
         }
 
     async def get_candidate_profiles(self, user_id: str) -> list[dict[str, Any]]:
-        """Fetch all other profiles plus their interest IDs for recommendation scoring."""
+        """Fetch all other profiles plus their interest IDs for keyword-based recommendation scoring."""
         profile_rows = await self._execute_rows(
             self.client.table("profiles")
-            .select("id, role, bio, location_city, embedding")
+            .select("id, role, location_city")
             .neq("id", user_id)
         )
         if not profile_rows:
@@ -104,9 +104,7 @@ class DatabaseClient:
                 {
                     "id": candidate_id,
                     "role": row.get("role"),
-                    "bio": row.get("bio"),
                     "location_city": row.get("location_city"),
-                    "embedding": self._parse_embedding(row.get("embedding")),
                     "interest_ids": interest_map.get(candidate_id, set()),
                 }
             )
