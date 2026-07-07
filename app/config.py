@@ -1,7 +1,12 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEPRECATED_GROQ_MODEL_ALIASES = {
+    "llama3-70b-8192": "llama-3.3-70b-versatile",
+    "llama3-8b-8192": "llama-3.1-8b-instant",
+}
 
 
 class Settings(BaseSettings):
@@ -26,6 +31,14 @@ class Settings(BaseSettings):
     default_results_limit: int = Field(default=5, alias="DEFAULT_RESULTS_LIMIT")
     mentor_results_limit: int = Field(default=6, alias="MENTOR_RESULTS_LIMIT")
     job_results_limit: int = Field(default=6, alias="JOB_RESULTS_LIMIT")
+
+    @model_validator(mode="after")
+    def normalize_groq_model(self) -> "Settings":
+        """Keep older deployment env values working after Groq model migrations."""
+        normalized_model = DEPRECATED_GROQ_MODEL_ALIASES.get(self.groq_model, self.groq_model)
+        if normalized_model != self.groq_model:
+            self.groq_model = normalized_model
+        return self
 
 
 @lru_cache(maxsize=1)

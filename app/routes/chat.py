@@ -26,6 +26,27 @@ CHAT_FALLBACK_ANSWER = (
     "I couldn't complete that request right now, but the CineMyst AI service is online. "
     "Please try again in a moment."
 )
+GREETING_FALLBACK_ANSWER = (
+    "Hi, I'm here. Ask me about CineMyst mentors, jobs, pricing, availability, "
+    "or what fits your profile best."
+)
+GREETING_MESSAGES = {
+    "hello",
+    "hello how are u",
+    "hello how are you",
+    "hey",
+    "hi",
+    "hii",
+    "yo",
+}
+
+
+def fallback_answer_for(message: str) -> str:
+    """Return a user-friendly fallback when the AI provider fails."""
+    normalized_message = " ".join(message.lower().strip().split())
+    if normalized_message in GREETING_MESSAGES:
+        return GREETING_FALLBACK_ANSWER
+    return CHAT_FALLBACK_ANSWER
 
 
 @router.get("/users/{user_id}/context", response_model=UserContextResponse)
@@ -89,7 +110,7 @@ async def chat(
         )
     except Exception:  # noqa: BLE001
         logger.exception("Chat request failed")
-        answer = CHAT_FALLBACK_ANSWER
+        answer = fallback_answer_for(request.message)
         profile_summary = ""
     return ChatResponse(
         answer=answer,
