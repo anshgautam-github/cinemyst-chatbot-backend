@@ -2,7 +2,7 @@ import json
 from typing import List
 
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from pydantic import BaseModel, Field
 
 from app.config import get_settings
@@ -43,10 +43,10 @@ Provide your final output in the requested JSON format.
 class LLMJudge:
     def __init__(self):
         settings = get_settings()
-        # We use a capable model for the judge, ideally gpt-4o. We'll use the default from settings.
-        self.llm = ChatOpenAI(
-            api_key=settings.openai_api_key,
-            model=settings.openai_model,
+        # We use a capable model for the judge
+        self.llm = ChatGroq(
+            api_key=settings.groq_api_key,
+            model_name=settings.groq_model,
             temperature=0.0,
         )
         self.structured_llm = self.llm.with_structured_output(EvaluationResult)

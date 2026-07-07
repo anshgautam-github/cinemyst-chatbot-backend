@@ -6,7 +6,7 @@ from app.services.profile_service import ProfileService
 from app.services.recommendation_service import RecommendationService
 from app.supabase_service import SupabaseService
 from app.utils.db import DatabaseClient
-from app.utils.openai_service import OpenAIService
+from app.utils.llm_service import LLMService
 
 
 @lru_cache(maxsize=1)
@@ -49,17 +49,17 @@ def get_database_client() -> DatabaseClient:
 
 
 @lru_cache(maxsize=1)
-def get_openai_service() -> OpenAIService:
-    """Share one OpenAI helper for embeddings and interest extraction."""
-    return OpenAIService(get_settings())
+def get_llm_service() -> LLMService:
+    """Share one Groq helper for interest extraction."""
+    return LLMService(get_settings())
 
 
 @lru_cache(maxsize=1)
 def get_profile_service() -> ProfileService:
-    """Build the profile processing service from the shared DB and OpenAI helpers."""
+    """Build the profile processing service from the shared DB and LLM helpers."""
     return ProfileService(
         db=get_database_client(),
-        openai_service=get_openai_service(),
+        llm_service=get_llm_service(),
     )
 
 

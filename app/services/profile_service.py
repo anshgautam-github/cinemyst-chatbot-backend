@@ -3,25 +3,23 @@ from __future__ import annotations
 from fastapi import HTTPException
 
 from app.utils.db import DatabaseClient
-from app.utils.openai_service import OpenAIService
+from app.utils.llm_service import LLMService
 
 
 class ProfileService:
-    """Coordinates profile enrichment: embedding creation plus DB-validated interest mapping."""
+    """Coordinates profile enrichment: DB-validated interest mapping."""
 
-    def __init__(self, db: DatabaseClient, openai_service: OpenAIService) -> None:
+    def __init__(self, db: DatabaseClient, llm_service: LLMService) -> None:
         self.db = db
-        self.openai_service = openai_service
+        self.llm_service = llm_service
 
     async def process_user_profile(self, user_id: str) -> dict[str, object]:
-        """Refresh one profile's embedding and replace its stored interests."""
+        """Refresh one profile's stored interests."""
         profile = await self.db.get_profile(user_id)
         if profile is None:
             raise HTTPException(status_code=404, detail="Profile not found.")
 
         profile_text = self._build_profile_text(profile)
-        embedding = await self.openai_service.generate_embedding(profile_text)
-        await self.db.update_embedding(user_id, embedding)
 
         interests = await self.db.get_all_interests()
         interest_name_map = {
@@ -34,7 +32,7 @@ class ProfileService:
         }
         interest_names = [item["name"] for item in interest_name_map.values()]
 
-        extracted_names = await self.openai_service.extract_interests(
+        extracted_names = await self.llm_service.extract_interests(
             bio=profile_text,
             interest_list=interest_names,
         )
@@ -58,7 +56,6 @@ class ProfileService:
 
         return {
             "user_id": user_id,
-            "embedding_dimensions": len(embedding),
             "interest_count": len(valid_interest_ids),
             "interests": valid_interest_names,
         }

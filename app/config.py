@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     app_host: str = Field(default="0.0.0.0", alias="APP_HOST")
     app_port: int = Field(default=8000, alias="APP_PORT")
 
-    openai_api_key: str = Field(alias="OPENAI_API_KEY")
-    openai_model: str = Field(default="gpt-4.1-mini", alias="OPENAI_MODEL")
+    groq_api_key: str = Field(alias="GROQ_API_KEY")
+    groq_model: str = Field(default="llama3-70b-8192", alias="GROQ_MODEL")
 
     supabase_url: str = Field(alias="SUPABASE_URL")
     supabase_key: str = Field(alias="SUPABASE_KEY")

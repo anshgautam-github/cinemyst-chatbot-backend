@@ -3,33 +3,21 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from langchain_openai import ChatOpenAI, OpenAIEmbeddings
+from langchain_groq import ChatGroq
 
 from app.config import Settings
 
 
-class OpenAIService:
-    """Thin wrapper around OpenAI-powered tasks used by recommendations."""
+class LLMService:
+    """Thin wrapper around Groq-powered tasks used by recommendations."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self._embedding_client = OpenAIEmbeddings(
-            api_key=settings.openai_api_key,
-            model="text-embedding-3-small",
-        )
-        self._chat_client = ChatOpenAI(
-            api_key=settings.openai_api_key,
-            model=settings.openai_model,
+        self._chat_client = ChatGroq(
+            api_key=settings.groq_api_key,
+            model_name=settings.groq_model,
             temperature=0,
         )
-
-    async def generate_embedding(self, text: str) -> list[float]:
-        """Create a semantic vector for a profile summary that can be compared later."""
-        cleaned_text = text.strip()
-        if not cleaned_text:
-            return []
-        embedding = await self._embedding_client.aembed_query(cleaned_text)
-        return [float(value) for value in embedding]
 
     async def extract_interests(self, bio: str, interest_list: list[str]) -> list[str]:
         """Ask the model to map free-form profile text onto the fixed interest taxonomy."""
@@ -48,10 +36,10 @@ class OpenAIService:
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError as error:
-            raise ValueError("OpenAI interest extraction did not return valid JSON.") from error
+            raise ValueError("Groq interest extraction did not return valid JSON.") from error
 
         if not isinstance(parsed, list):
-            raise ValueError("OpenAI interest extraction must return a JSON array.")
+            raise ValueError("Groq interest extraction must return a JSON array.")
 
         results: list[str] = []
         for item in parsed:

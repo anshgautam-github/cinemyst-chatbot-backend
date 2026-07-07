@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from langchain_core.messages import AIMessageChunk
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langgraph.prebuilt import create_react_agent
 
 from .config import Settings
@@ -55,9 +55,9 @@ class CineMystChatAgent:
 
     def _build_agent(self, user_id: str):
         """Create a fresh LangGraph agent per request using the current user context."""
-        model = ChatOpenAI(
-            api_key=self.settings.openai_api_key,
-            model=self.settings.openai_model,
+        model = ChatGroq(
+            api_key=self.settings.groq_api_key,
+            model_name=self.settings.groq_model,
             temperature=0.2,
         )
         prompt = build_system_prompt(user_id=user_id, user_summary=self._build_user_summary(user_id))
