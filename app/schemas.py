@@ -19,6 +19,28 @@ class ChatResponse(BaseModel):
     profile_summary: str
 
 
+class CastingDraftRequest(BaseModel):
+    """Request body for generating a structured casting-post draft."""
+    user_id: str = Field(description="The CineMyst profiles.id for the current user.")
+    rough_idea: str = Field(default="", description="The rough role idea typed by the user.")
+    context: str = Field(
+        default="",
+        description="Existing form context flattened into plain text.",
+    )
+
+
+class CastingDraftResponse(BaseModel):
+    """Structured casting-post draft returned to the iOS job-posting flow."""
+    project_title: str | None = None
+    project_type: str | None = None
+    character_name: str | None = None
+    character_description: str | None = None
+    age_range: str | None = None
+    gender: str | None = None
+    position: str | None = None
+    genre: str | None = None
+
+
 class UserContextResponse(BaseModel):
     """Profile snapshot plus recent bookings shown around the chat UI."""
     user_id: str

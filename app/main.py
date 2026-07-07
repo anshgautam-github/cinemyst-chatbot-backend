@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .routes.casting import router as casting_router
 from .routes.chat import router as chat_router
 from .routes.recommendation import router as recommendation_router
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(chat_router)
     app.include_router(recommendation_router)
+    app.include_router(casting_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

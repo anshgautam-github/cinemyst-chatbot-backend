@@ -6,6 +6,7 @@ from typing import Any
 from langchain_groq import ChatGroq
 
 from app.config import Settings
+from app.schemas import CastingDraftResponse
 
 
 class LLMService:
@@ -48,6 +49,100 @@ class LLMService:
                 if cleaned_item:
                     results.append(cleaned_item)
         return results
+
+    async def generate_casting_draft(self, rough_idea: str, context: str) -> CastingDraftResponse:
+        """Generate a structured casting-post draft for the job-posting flow."""
+        prompt = self._build_casting_draft_prompt(rough_idea=rough_idea, context=context)
+        response = await self._chat_client.ainvoke(prompt)
+        content = self._coerce_text(response.content)
+        payload = self._extract_json_object(content)
+
+        try:
+            parsed = json.loads(payload)
+        except json.JSONDecodeError as error:
+            raise ValueError("Casting AI did not return valid JSON.") from error
+
+        if not isinstance(parsed, dict):
+            raise ValueError("Casting AI must return a JSON object.")
+
+        normalized = {
+            "project_title": self._clean_text(parsed.get("project_title")),
+            "project_type": self._normalize_choice(
+                parsed.get("project_type"),
+                ["Web Series", "TV", "Film", "Short Film", "Ad/Commercial"],
+            ),
+            "character_name": self._clean_text(parsed.get("character_name")),
+            "character_description": self._clean_text(parsed.get("character_description")),
+            "age_range": self._clean_text(parsed.get("age_range")),
+            "gender": self._normalize_choice(
+                parsed.get("gender"),
+                ["Male", "Female", "Non-Binary", "Any"],
+            ),
+            "position": self._normalize_choice(
+                parsed.get("position"),
+                ["Lead Actor", "Supporting", "Junior Artist", "Child Artist"],
+            ),
+            "genre": self._normalize_choice(
+                parsed.get("genre"),
+                ["Drama", "Comedy", "Action", "Horror", "Sci-Fi", "Romance", "Thriller"],
+            ),
+        }
+        return CastingDraftResponse(**normalized)
+
+    def _build_casting_draft_prompt(self, rough_idea: str, context: str) -> str:
+        return f"""
+You are CineMyst's AI Casting Post Generator for film directors and casting professionals.
+Create a polished, concise casting role draft from the rough idea and any fields already entered.
+
+Return ONLY valid JSON. Do not include markdown, backticks, comments, or extra prose.
+
+JSON schema:
+{{
+  "project_title": "Professional project title, keep existing title if provided",
+  "project_type": "One of: Web Series, TV, Film, Short Film, Ad/Commercial",
+  "character_name": "Character name",
+  "character_description": "Professional casting description in 3-5 sentences. Include performance tone, personality, actor expectations, and screen presence requirements.",
+  "age_range": "Example: 20-30",
+  "gender": "One of: Male, Female, Non-Binary, Any",
+  "position": "One of: Lead Actor, Supporting, Junior Artist, Child Artist",
+  "genre": "One of: Drama, Comedy, Action, Horror, Sci-Fi, Romance, Thriller"
+}}
+
+Keep the result realistic for an Indian film/casting app. Avoid fake guarantees, discrimination, unsafe claims, or overly long text.
+
+Rough role idea:
+{rough_idea.strip() or "Not provided"}
+
+Existing form context:
+{context.strip() or "Not provided"}
+""".strip()
+
+    def _extract_json_object(self, text: str) -> str:
+        stripped = text.strip()
+        if stripped.startswith("{") and stripped.endswith("}"):
+            return stripped
+
+        start = stripped.find("{")
+        end = stripped.rfind("}")
+        if start == -1 or end == -1 or start >= end:
+            raise ValueError("Casting AI response was not valid JSON.")
+        return stripped[start : end + 1]
+
+    def _clean_text(self, value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        cleaned = " ".join(value.strip().split())
+        return cleaned or None
+
+    def _normalize_choice(self, value: Any, options: list[str]) -> str | None:
+        cleaned = self._clean_text(value)
+        if not cleaned:
+            return None
+
+        for option in options:
+            if option.casefold() == cleaned.casefold():
+                return option
+        return cleaned
 
     def _coerce_text(self, content: Any) -> str:
         """Flatten LangChain response content into plain text before JSON parsing."""
