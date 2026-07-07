@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
 
 from .config import Settings
+from .guardrails import InputGuardrail, OutputGuardrail
 from .prompts import build_system_prompt
 from .supabase_service import SupabaseService
 from .tools import build_tools
@@ -15,9 +16,17 @@ from .tools import build_tools
 class CineMystChatAgent:
     """Owns the AI chat workflow from prompt creation through stored conversation history."""
 
-    def __init__(self, settings: Settings, supabase_service: SupabaseService) -> None:
+    def __init__(
+        self, 
+        settings: Settings, 
+        supabase_service: SupabaseService,
+        input_guard: InputGuardrail,
+        output_guard: OutputGuardrail,
+    ) -> None:
         self.settings = settings
         self.supabase_service = supabase_service
+        self.input_guard = input_guard
+        self.output_guard = output_guard
         self.tools = build_tools(supabase_service)
 
     def _build_user_summary(self, user_id: str) -> str:
@@ -73,6 +82,11 @@ class CineMystChatAgent:
 
     def chat(self, user_id: str, message: str, conversation_id: str) -> tuple[str, str]:
         """Run a full request/response chat cycle and persist both user and assistant messages."""
+        # ── INPUT GUARDRAIL ─────────────────────────────────────────
+        input_result = self.input_guard.validate(message, user_id)
+        if not input_result.is_safe:
+            return input_result.user_message or "Request blocked.", self._build_user_summary(user_id)
+
         self.supabase_service.ensure_conversation(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -97,6 +111,11 @@ class CineMystChatAgent:
                 if isinstance(item, dict) and item.get("type") == "text"
             )
         answer = str(content).strip() or "I couldn't generate a response right now."
+
+        # ── OUTPUT GUARDRAIL ────────────────────────────────────────
+        output_result = self.output_guard.validate(answer, user_id)
+        final_answer = answer if output_result.is_safe else (output_result.user_message or answer)
+
         self.supabase_service.save_conversation_message(
             conversation_id=conversation_id,
             user_id=user_id,
@@ -107,14 +126,20 @@ class CineMystChatAgent:
             conversation_id=conversation_id,
             user_id=user_id,
             role="assistant",
-            content=answer,
+            content=final_answer,
         )
-        return answer, self._build_user_summary(user_id)
+        return final_answer, self._build_user_summary(user_id)
 
     async def stream_chat(
         self, user_id: str, message: str, conversation_id: str
     ) -> AsyncIterator[str]:
         """Stream a response token-by-token while still persisting the final answer at the end."""
+        # ── INPUT GUARDRAIL ─────────────────────────────────────────
+        input_result = self.input_guard.validate(message, user_id)
+        if not input_result.is_safe:
+            yield input_result.user_message or "Request blocked."
+            return
+
         self.supabase_service.ensure_conversation(
             user_id=user_id,
             conversation_id=conversation_id,
@@ -146,6 +171,14 @@ class CineMystChatAgent:
             return
 
         answer = "".join(collected_parts).strip()
+        
+        # ── OUTPUT GUARDRAIL ────────────────────────────────────────
+        # For streaming, the user already saw the tokens as they were generated.
+        # But we still run the output guard before saving to the database to ensure
+        # that PII or JSON dumps aren't permanently persisted into the chat history.
+        output_result = self.output_guard.validate(answer, user_id)
+        final_answer = answer if output_result.is_safe else (output_result.user_message or answer)
+
         self.supabase_service.save_conversation_message(
             conversation_id=conversation_id,
             user_id=user_id,
@@ -156,7 +189,7 @@ class CineMystChatAgent:
             conversation_id=conversation_id,
             user_id=user_id,
             role="assistant",
-            content=answer or "I couldn't generate a response right now.",
+            content=final_answer or "I couldn't generate a response right now.",
         )
 
     def _extract_stream_text(self, chunk: object) -> str:

@@ -15,11 +15,31 @@ def get_supabase_service() -> SupabaseService:
     return SupabaseService(get_settings())
 
 
+from app.guardrails import InputGuardrail, OutputGuardrail
+
+
+@lru_cache(maxsize=1)
+def get_input_guardrail() -> InputGuardrail:
+    """Singleton input guardrail for stateful rate limiting."""
+    return InputGuardrail()
+
+
+@lru_cache(maxsize=1)
+def get_output_guardrail() -> OutputGuardrail:
+    """Singleton output guardrail."""
+    return OutputGuardrail()
+
+
 @lru_cache(maxsize=1)
 def get_chat_agent() -> CineMystChatAgent:
-    """Reuse one chat agent factory backed by the shared Supabase service."""
+    """Reuse one chat agent factory backed by the shared Supabase service and guardrails."""
     settings: Settings = get_settings()
-    return CineMystChatAgent(settings, get_supabase_service())
+    return CineMystChatAgent(
+        settings, 
+        get_supabase_service(),
+        get_input_guardrail(),
+        get_output_guardrail(),
+    )
 
 
 @lru_cache(maxsize=1)
