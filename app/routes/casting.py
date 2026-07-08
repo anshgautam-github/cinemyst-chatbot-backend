@@ -31,4 +31,5 @@ async def generate_casting_draft(
         raise HTTPException(status_code=502, detail=str(error)) from error
     except Exception as error:  # noqa: BLE001
         logger.exception("Casting draft generation failed")
-        raise HTTPException(status_code=503, detail="Casting AI service unavailable") from error
+        detail = f"Casting AI service unavailable: {error}"
+        raise HTTPException(status_code=503, detail=detail) from error

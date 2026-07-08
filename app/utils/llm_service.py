@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any
@@ -171,19 +172,32 @@ Existing form context:
             candidates.append(fallback_model)
         return candidates
 
-    async def _ainvoke_with_model_fallback(self, prompt: str, temperature: float):
+    async def _ainvoke_with_model_fallback(
+        self,
+        prompt: str,
+        temperature: float,
+        *,
+        max_retries: int = 2,
+    ):
         errors: list[str] = []
         for model_name in self._groq_model_candidates:
-            try:
-                client = ChatGroq(
-                    api_key=self.settings.groq_api_key,
-                    model_name=model_name,
-                    temperature=temperature,
-                )
-                return await client.ainvoke(prompt)
-            except Exception as error:  # noqa: BLE001
-                errors.append(f"{model_name}: {error}")
-                logger.warning("Groq model attempt failed", exc_info=True)
+            for attempt in range(1, max_retries + 1):
+                try:
+                    client = ChatGroq(
+                        api_key=self.settings.groq_api_key,
+                        model_name=model_name,
+                        temperature=temperature,
+                        request_timeout=60,
+                    )
+                    return await client.ainvoke(prompt)
+                except Exception as error:  # noqa: BLE001
+                    tag = f"{model_name} attempt {attempt}/{max_retries}"
+                    errors.append(f"{tag}: {error}")
+                    logger.warning("%s failed: %s", tag, error, exc_info=True)
+                    if attempt < max_retries:
+                        delay = 2 ** attempt  # 2s, 4s
+                        logger.info("Retrying %s in %ss...", model_name, delay)
+                        await asyncio.sleep(delay)
 
         raise ValueError(
             "Groq AI request failed for all configured models: " + "; ".join(errors)
