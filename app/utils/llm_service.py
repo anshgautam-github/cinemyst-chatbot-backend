@@ -19,6 +19,11 @@ class LLMService:
             model_name=settings.groq_model,
             temperature=0,
         )
+        self._casting_client = ChatGroq(
+            api_key=settings.groq_api_key,
+            model_name=settings.groq_model,
+            temperature=0.4,
+        )
 
     async def extract_interests(self, bio: str, interest_list: list[str]) -> list[str]:
         """Ask the model to map free-form profile text onto the fixed interest taxonomy."""
@@ -53,7 +58,7 @@ class LLMService:
     async def generate_casting_draft(self, rough_idea: str, context: str) -> CastingDraftResponse:
         """Generate a structured casting-post draft for the job-posting flow."""
         prompt = self._build_casting_draft_prompt(rough_idea=rough_idea, context=context)
-        response = await self._chat_client.ainvoke(prompt)
+        response = await self._casting_client.ainvoke(prompt)
         content = self._coerce_text(response.content)
         payload = self._extract_json_object(content)
 
@@ -93,6 +98,9 @@ class LLMService:
         return f"""
 You are CineMyst's AI Casting Post Generator for film directors and casting professionals.
 Create a polished, concise casting role draft from the rough idea and any fields already entered.
+Use the input as inspiration only. Generate fresh, professional copy for every field.
+Do not copy the rough idea or existing context verbatim into the output.
+If a title or description is already present, improve it instead of repeating it exactly.
 
 Return ONLY valid JSON. Do not include markdown, backticks, comments, or extra prose.
 
@@ -109,6 +117,7 @@ JSON schema:
 }}
 
 Keep the result realistic for an Indian film/casting app. Avoid fake guarantees, discrimination, unsafe claims, or overly long text.
+The existing form context is a hint, not a template. Do not preserve draft wording exactly.
 
 Rough role idea:
 {rough_idea.strip() or "Not provided"}
