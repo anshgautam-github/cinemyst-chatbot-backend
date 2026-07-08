@@ -5,7 +5,7 @@ This is a standalone chatbot backend for CineMyst built with:
 - FastAPI
 - LangChain
 - LangGraph
-- OpenAI
+- Groq
 - Supabase
 
 It is designed to answer product-aware questions about:
@@ -48,7 +48,7 @@ chatbot_backend/
       recommendation_service.py
     utils/
       db.py
-      openai_service.py
+      llm_service.py
   .env.example
   pyproject.toml
   README.md
@@ -62,7 +62,7 @@ The backend is now organized by responsibility:
 - `app/routes/` contains HTTP endpoints only
 - `app/dependencies.py` creates shared singletons like DB clients and services
 - `app/services/` contains business logic
-- `app/utils/` contains integration helpers for OpenAI and Supabase recommendation queries
+- `app/utils/` contains integration helpers for Groq and Supabase recommendation queries
 - `app/agent.py` contains the AI concierge chat workflow
 - `app/supabase_service.py` contains the CineMyst chat/product data access layer
 
@@ -87,7 +87,7 @@ The backend is now organized by responsibility:
 
 Copy `.env.example` to `.env` and fill in:
 
-- `OPENAI_API_KEY`
+- `GROQ_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 - optionally `SUPABASE_SERVICE_ROLE_KEY`
@@ -128,7 +128,7 @@ Your iOS app should call that URL instead of `localhost`.
 
 Create server-side environment variables from `.env.example`:
 
-- `OPENAI_API_KEY`
+- `GROQ_API_KEY`
 - `SUPABASE_URL`
 - `SUPABASE_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from langchain_groq import ChatGroq
@@ -9,21 +10,15 @@ from app.config import Settings
 from app.schemas import CastingDraftResponse
 
 
+logger = logging.getLogger(__name__)
+
+
 class LLMService:
     """Thin wrapper around Groq-powered tasks used by recommendations."""
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self._chat_client = ChatGroq(
-            api_key=settings.groq_api_key,
-            model_name=settings.groq_model,
-            temperature=0,
-        )
-        self._casting_client = ChatGroq(
-            api_key=settings.groq_api_key,
-            model_name=settings.groq_model,
-            temperature=0.4,
-        )
+        self._groq_model_candidates = self._build_model_candidates(settings.groq_model)
 
     async def extract_interests(self, bio: str, interest_list: list[str]) -> list[str]:
         """Ask the model to map free-form profile text onto the fixed interest taxonomy."""
@@ -37,7 +32,7 @@ class LLMService:
             f"Bio:\n{bio.strip()}"
         )
 
-        response = await self._chat_client.ainvoke(prompt)
+        response = await self._ainvoke_with_model_fallback(prompt, temperature=0)
         content = self._coerce_text(response.content)
         try:
             parsed = json.loads(content)
@@ -58,7 +53,7 @@ class LLMService:
     async def generate_casting_draft(self, rough_idea: str, context: str) -> CastingDraftResponse:
         """Generate a structured casting-post draft for the job-posting flow."""
         prompt = self._build_casting_draft_prompt(rough_idea=rough_idea, context=context)
-        response = await self._casting_client.ainvoke(prompt)
+        response = await self._ainvoke_with_model_fallback(prompt, temperature=0.4)
         content = self._coerce_text(response.content)
         payload = self._extract_json_object(content)
 
@@ -168,3 +163,28 @@ Existing form context:
             return "".join(parts).strip()
 
         return str(content).strip()
+
+    def _build_model_candidates(self, primary_model: str) -> list[str]:
+        candidates = [primary_model.strip()]
+        fallback_model = "llama-3.1-8b-instant"
+        if fallback_model not in candidates:
+            candidates.append(fallback_model)
+        return candidates
+
+    async def _ainvoke_with_model_fallback(self, prompt: str, temperature: float):
+        errors: list[str] = []
+        for model_name in self._groq_model_candidates:
+            try:
+                client = ChatGroq(
+                    api_key=self.settings.groq_api_key,
+                    model_name=model_name,
+                    temperature=temperature,
+                )
+                return await client.ainvoke(prompt)
+            except Exception as error:  # noqa: BLE001
+                errors.append(f"{model_name}: {error}")
+                logger.warning("Groq model attempt failed", exc_info=True)
+
+        raise ValueError(
+            "Groq AI request failed for all configured models: " + "; ".join(errors)
+        )
